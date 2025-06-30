@@ -21,6 +21,7 @@ import {
   TrendingUp,
   Smile,
   X,
+  Trash2,
 } from 'lucide-react-native';
 
 const moods = [
@@ -104,6 +105,35 @@ export default function MoodScreen() {
     }
   };
 
+  const deleteMoodEntry = async (entryId: string) => {
+    Alert.alert(
+      'Delete Mood Entry',
+      'Are you sure you want to delete this mood entry?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('mood_entries')
+                .delete()
+                .eq('id', entryId);
+
+              if (error) throw error;
+
+              setMoodEntries(moodEntries.filter(entry => entry.id !== entryId));
+            } catch (error) {
+              console.error('Error deleting mood entry:', error);
+              Alert.alert('Error', 'Failed to delete mood entry');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const getAverageMood = () => {
     if (moodEntries.length === 0) return 0;
     const sum = moodEntries.reduce((acc, entry) => acc + entry.mood, 0);
@@ -178,7 +208,7 @@ export default function MoodScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={true}>
         {/* Stats */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
@@ -250,10 +280,18 @@ export default function MoodScreen() {
                   </Text>
                 </View>
               </View>
-              <View style={[
-                styles.moodIndicator,
-                { backgroundColor: moodColors[entry.mood as keyof typeof moodColors] }
-              ]} />
+              <View style={styles.moodRight}>
+                <View style={[
+                  styles.moodIndicator,
+                  { backgroundColor: moodColors[entry.mood as keyof typeof moodColors] }
+                ]} />
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => deleteMoodEntry(entry.id)}
+                >
+                  <Trash2 size={16} color={colors.error} />
+                </TouchableOpacity>
+              </View>
             </View>
           ))}
 
@@ -283,7 +321,7 @@ export default function MoodScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.modalContent}>
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={true}>
             <View style={styles.moodSelector}>
               {moods.map((mood) => (
                 <TouchableOpacity
@@ -324,7 +362,7 @@ export default function MoodScreen() {
             >
               <Text style={styles.createButtonText}>Save Mood</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -450,10 +488,17 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
+  moodRight: {
+    alignItems: 'center',
+    gap: 8,
+  },
   moodIndicator: {
     width: 12,
     height: 12,
     borderRadius: 6,
+  },
+  deleteButton: {
+    padding: 4,
   },
   emptyState: {
     alignItems: 'center',

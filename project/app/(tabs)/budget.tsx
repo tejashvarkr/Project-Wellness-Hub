@@ -22,6 +22,9 @@ import {
   Calendar,
   X,
   ShoppingCart,
+  Trash2,
+  Euro,
+  PoundSterling,
 } from 'lucide-react-native';
 
 const categories = [
@@ -34,12 +37,20 @@ const categories = [
   'other',
 ];
 
+const currencies = [
+  { symbol: '$', name: 'USD', icon: DollarSign },
+  { symbol: '€', name: 'EUR', icon: Euro },
+  { symbol: '£', name: 'GBP', icon: PoundSterling },
+  { symbol: '₹', name: 'INR', icon: DollarSign },
+];
+
 export default function BudgetScreen() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('other');
+  const [selectedCurrency, setSelectedCurrency] = useState(0);
   const [loading, setLoading] = useState(true);
   const isMountedRef = useRef(true);
 
@@ -96,6 +107,7 @@ export default function BudgetScreen() {
           amount: numAmount,
           description: description.trim(),
           category: selectedCategory,
+          currency: currencies[selectedCurrency].name,
           user_id: user?.id,
         })
         .select()
@@ -114,6 +126,35 @@ export default function BudgetScreen() {
       console.error('Error adding expense:', error);
       Alert.alert('Error', 'Failed to add expense');
     }
+  };
+
+  const deleteExpense = async (expenseId: string) => {
+    Alert.alert(
+      'Delete Expense',
+      'Are you sure you want to delete this expense?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('expenses')
+                .delete()
+                .eq('id', expenseId);
+
+              if (error) throw error;
+
+              setExpenses(expenses.filter(expense => expense.id !== expenseId));
+            } catch (error) {
+              console.error('Error deleting expense:', error);
+              Alert.alert('Error', 'Failed to delete expense');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const getTotalExpenses = () => {
@@ -154,8 +195,9 @@ export default function BudgetScreen() {
     }));
   };
 
-  const formatCurrency = (amount: number) => {
-    return `$${amount.toFixed(2)}`;
+  const formatCurrency = (amount: number, currencyName?: string) => {
+    const currency = currencies.find(c => c.name === currencyName) || currencies[selectedCurrency];
+    return `${currency.symbol}${amount.toFixed(2)}`;
   };
 
   const styles = createStyles(colors);
@@ -176,7 +218,7 @@ export default function BudgetScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={true}>
         {/* Stats */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
@@ -232,9 +274,17 @@ export default function BudgetScreen() {
                   </Text>
                 </View>
               </View>
-              <Text style={styles.expenseAmount}>
-                {formatCurrency(expense.amount)}
-              </Text>
+              <View style={styles.expenseRight}>
+                <Text style={styles.expenseAmount}>
+                  {formatCurrency(expense.amount, expense.currency)}
+                </Text>
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => deleteExpense(expense.id)}
+                >
+                  <Trash2 size={16} color={colors.error} />
+                </TouchableOpacity>
+              </View>
             </View>
           ))}
 
@@ -264,7 +314,31 @@ export default function BudgetScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.modalContent}>
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={true}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Currency</Text>
+              <View style={styles.currencyGrid}>
+                {currencies.map((currency, index) => (
+                  <TouchableOpacity
+                    key={currency.name}
+                    style={[
+                      styles.currencyChip,
+                      selectedCurrency === index && styles.currencyChipSelected,
+                    ]}
+                    onPress={() => setSelectedCurrency(index)}
+                  >
+                    <currency.icon size={16} color={selectedCurrency === index ? colors.primary : colors.textSecondary} />
+                    <Text style={[
+                      styles.currencyChipText,
+                      selectedCurrency === index && styles.currencyChipTextSelected
+                    ]}>
+                      {currency.symbol} {currency.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Amount *</Text>
               <TextInput
@@ -315,7 +389,7 @@ export default function BudgetScreen() {
             <TouchableOpacity style={styles.createButton} onPress={addExpense}>
               <Text style={styles.createButtonText}>Add Expense</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -438,10 +512,17 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  expenseRight: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
   expenseAmount: {
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.text,
+  },
+  deleteButton: {
+    padding: 4,
   },
   emptyState: {
     alignItems: 'center',
@@ -500,6 +581,34 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 16,
     color: colors.text,
     backgroundColor: colors.surface,
+  },
+  currencyGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  currencyChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    gap: 6,
+  },
+  currencyChipSelected: {
+    backgroundColor: colors.primary + '20',
+    borderColor: colors.primary,
+  },
+  currencyChipText: {
+    fontSize: 14,
+    color: colors.text,
+  },
+  currencyChipTextSelected: {
+    color: colors.primary,
+    fontWeight: '600',
   },
   categoryGrid: {
     flexDirection: 'row',

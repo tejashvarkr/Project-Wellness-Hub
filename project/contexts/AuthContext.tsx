@@ -10,6 +10,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signUp: (email: string, password: string, fullName: string, username: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error?: string }>;
   updatePoints: (points: number) => Promise<void>;
 }
 
@@ -200,6 +201,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  async function resetPassword(email: string) {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      });
+
+      if (error) {
+        console.error('Reset password error:', error);
+        return { error: error.message };
+      }
+
+      return {};
+    } catch (error: any) {
+      console.error('Reset password error:', error);
+      return { error: error.message || 'An unexpected error occurred' };
+    }
+  }
+
   async function signOut() {
     try {
       setLoading(true);
@@ -255,6 +274,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signUp,
     signOut,
+    resetPassword,
     updatePoints,
   };
 

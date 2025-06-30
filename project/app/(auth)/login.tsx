@@ -14,15 +14,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Link, useRouter } from 'expo-router';
-import { Heart, Mail, Lock } from 'lucide-react-native';
+import { Heart, Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const { signIn } = useAuth();
+  const { signIn, resetPassword } = useAuth();
   const { colors } = useTheme();
   const router = useRouter();
 
@@ -45,11 +46,34 @@ export default function LoginScreen() {
     if (signInError) {
       setError(signInError);
     } else {
-      // Navigation will be handled by the auth state change
       router.replace('/(tabs)');
     }
     
     setLoading(false);
+  }
+
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      Alert.alert('Email Required', 'Please enter your email address first.');
+      return;
+    }
+
+    if (!email.includes('@')) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+
+    const { error } = await resetPassword(email);
+    
+    if (error) {
+      Alert.alert('Error', error);
+    } else {
+      Alert.alert(
+        'Reset Email Sent',
+        'Check your email for password reset instructions.',
+        [{ text: 'OK' }]
+      );
+    }
   }
 
   const styles = createStyles(colors);
@@ -106,10 +130,30 @@ export default function LoginScreen() {
                   setPassword(text);
                   setError(null);
                 }}
-                secureTextEntry
+                secureTextEntry={!showPassword}
                 editable={!loading}
               />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.eyeButton}
+              >
+                {showPassword ? (
+                  <EyeOff size={20} color={colors.textSecondary} />
+                ) : (
+                  <Eye size={20} color={colors.textSecondary} />
+                )}
+              </TouchableOpacity>
             </View>
+
+            <TouchableOpacity
+              style={styles.forgotPassword}
+              onPress={handleForgotPassword}
+              disabled={loading}
+            >
+              <Text style={[styles.forgotPasswordText, loading && styles.linkDisabled]}>
+                Forgot Password?
+              </Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.button, loading && styles.buttonDisabled]}
@@ -207,6 +251,18 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingLeft: 12,
     fontSize: 16,
     color: colors.text,
+  },
+  eyeButton: {
+    padding: 4,
+  },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginBottom: 16,
+  },
+  forgotPasswordText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
   button: {
     backgroundColor: colors.primary,

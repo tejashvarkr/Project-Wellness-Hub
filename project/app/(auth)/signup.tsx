@@ -15,13 +15,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Link, useRouter } from 'expo-router';
-import { Heart, Mail, Lock, User } from 'lucide-react-native';
+import { Heart, Mail, Lock, User, Eye, EyeOff } from 'lucide-react-native';
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -65,7 +66,6 @@ export default function SignUpScreen() {
     if (signUpError) {
       setError(signUpError);
     } else {
-      // Navigation will be handled by the auth state change
       router.replace('/(tabs)');
     }
     
@@ -83,7 +83,7 @@ export default function SignUpScreen() {
         colors={[colors.secondary, colors.primary]}
         style={styles.gradient}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
             <View style={styles.header}>
               <Heart size={48} color="#FFFFFF" />
@@ -159,9 +159,19 @@ export default function SignUpScreen() {
                     setPassword(text);
                     setError(null);
                   }}
-                  secureTextEntry
+                  secureTextEntry={!showPassword}
                   editable={!loading}
                 />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeButton}
+                >
+                  {showPassword ? (
+                    <EyeOff size={20} color={colors.textSecondary} />
+                  ) : (
+                    <Eye size={20} color={colors.textSecondary} />
+                  )}
+                </TouchableOpacity>
               </View>
 
               <TouchableOpacity
@@ -265,6 +275,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingLeft: 12,
     fontSize: 16,
     color: colors.text,
+  },
+  eyeButton: {
+    padding: 4,
   },
   button: {
     backgroundColor: colors.secondary,

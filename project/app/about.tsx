@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,15 @@ import {
   ScrollView,
   TouchableOpacity,
   Linking,
+  Modal,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
+import { supabase } from '@/services/supabase';
 import {
   ArrowLeft,
   Heart,
@@ -21,10 +26,19 @@ import {
   Award,
   Lightbulb,
   Smile,
+  Star,
+  MessageSquare,
+  X,
 } from 'lucide-react-native';
 
 export default function AboutScreen() {
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [feedback, setFeedback] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
   const { colors } = useTheme();
+  const { user } = useAuth();
   const router = useRouter();
 
   const handleEmailPress = () => {
@@ -33,6 +47,47 @@ export default function AboutScreen() {
 
   const handleWebsitePress = () => {
     Linking.openURL('https://wellnesshub.com');
+  };
+
+  const submitFeedback = async () => {
+    if (rating === 0) {
+      Alert.alert('Rating Required', 'Please select a rating before submitting.');
+      return;
+    }
+
+    if (!feedback.trim()) {
+      Alert.alert('Feedback Required', 'Please provide your feedback.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('feedback')
+        .insert({
+          user_id: user?.id,
+          rating,
+          feedback: feedback.trim(),
+          user_email: user?.email,
+          user_name: user?.full_name,
+        });
+
+      if (error) throw error;
+
+      Alert.alert(
+        'Thank You!',
+        'Your feedback has been submitted successfully. We appreciate your input!',
+        [{ text: 'OK', onPress: () => setShowFeedbackModal(false) }]
+      );
+
+      setRating(0);
+      setFeedback('');
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      Alert.alert('Error', 'Failed to submit feedback. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const features = [
@@ -103,7 +158,7 @@ export default function AboutScreen() {
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={true}>
         {/* Mission */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Our Mission</Text>
@@ -184,6 +239,25 @@ export default function AboutScreen() {
           </View>
         </View>
 
+        {/* Feedback Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>We Value Your Feedback</Text>
+          <View style={styles.feedbackCard}>
+            <MessageSquare size={32} color={colors.accent} />
+            <Text style={styles.feedbackTitle}>Help Us Improve</Text>
+            <Text style={styles.feedbackDescription}>
+              Your feedback helps us make Wellness Hub better for everyone. Share your thoughts and rate your experience!
+            </Text>
+            <TouchableOpacity
+              style={styles.feedbackButton}
+              onPress={() => setShowFeedbackModal(true)}
+            >
+              <Star size={20} color="#FFFFFF" />
+              <Text style={styles.feedbackButtonText}>Give Feedback</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Contact */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Get in Touch</Text>
@@ -211,6 +285,63 @@ export default function AboutScreen() {
           <Text style={styles.versionText}>Made with ❤️ for your wellness journey</Text>
         </View>
       </ScrollView>
+
+      {/* Feedback Modal */}
+      <Modal
+        visible={showFeedbackModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Share Your Feedback</Text>
+            <TouchableOpacity onPress={() => setShowFeedbackModal(false)}>
+              <X size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={true}>
+            <Text style={styles.ratingLabel}>How would you rate Wellness Hub?</Text>
+            <View style={styles.ratingContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity
+                  key={star}
+                  onPress={() => setRating(star)}
+                  style={styles.starButton}
+                >
+                  <Star
+                    size={32}
+                    color={star <= rating ? colors.warning : colors.border}
+                    fill={star <= rating ? colors.warning : 'transparent'}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.feedbackLabel}>Tell us more about your experience:</Text>
+            <TextInput
+              style={styles.feedbackInput}
+              placeholder="What do you like about the app? What could we improve?"
+              placeholderTextColor={colors.textSecondary}
+              value={feedback}
+              onChangeText={setFeedback}
+              multiline
+              numberOfLines={6}
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity
+              style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
+              onPress={submitFeedback}
+              disabled={submitting}
+            >
+              <Text style={styles.submitButtonText}>
+                {submitting ? 'Submitting...' : 'Submit Feedback'}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -354,6 +485,40 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 20,
   },
+  feedbackCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  feedbackTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  feedbackDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  feedbackButton: {
+    flexDirection: 'row',
+    backgroundColor: colors.accent,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    alignItems: 'center',
+    gap: 8,
+  },
+  feedbackButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   contactCard: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
@@ -386,5 +551,76 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 4,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 60,
+    paddingBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  modalContent: {
+    flex: 1,
+    padding: 24,
+  },
+  ratingLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 32,
+  },
+  starButton: {
+    padding: 4,
+  },
+  feedbackLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  feedbackInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: colors.text,
+    backgroundColor: colors.surface,
+    height: 120,
+    marginBottom: 24,
+  },
+  submitButton: {
+    backgroundColor: colors.accent,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

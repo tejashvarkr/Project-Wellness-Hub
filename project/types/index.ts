@@ -28,6 +28,7 @@ export interface Expense {
   amount: number;
   category: string;
   description: string;
+  currency?: string;
   user_id: string;
   created_at: string;
 }
@@ -46,6 +47,16 @@ export interface PomodoroSession {
   completed: boolean;
   user_id: string;
   points_earned: number;
+  created_at: string;
+}
+
+export interface Feedback {
+  id: string;
+  user_id?: string;
+  rating: number; // 1-5 scale
+  feedback: string;
+  user_email?: string;
+  user_name?: string;
   created_at: string;
 }
 

@@ -6,13 +6,15 @@ import {
   ScrollView,
   TouchableOpacity,
   Linking,
+  Share,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/services/supabase';
-import { Settings, User, Award, TrendingUp, Clock, SquareCheck as CheckSquare, DollarSign, Smile, Heart, ShoppingBag, Moon, Sun, Info, Gamepad2, Music, Bell } from 'lucide-react-native';
+import { Settings, User, Award, TrendingUp, Clock, SquareCheck as CheckSquare, DollarSign, Smile, Heart, ShoppingBag, Moon, Sun, Info, Gamepad2, Music, Bell, Share2 } from 'lucide-react-native';
 
 interface TodayStats {
   pomodoroSessions: number;
@@ -113,7 +115,20 @@ export default function HomeScreen() {
   };
 
   const handleStoreLink = () => {
-    Linking.openURL('https://wellness-hub-store.example.com');
+    router.push('/shop');
+  };
+
+  const handleShareApp = async () => {
+    try {
+      const result = await Share.share({
+        message: 'Check out Wellness Hub - Your path to better living! Track habits, manage mood, and improve your wellness journey. Download now!',
+        url: 'https://wellnesshub.app', // Replace with actual app store URL
+        title: 'Wellness Hub - Better Living Made Simple',
+      });
+    } catch (error) {
+      console.error('Error sharing app:', error);
+      Alert.alert('Error', 'Unable to share the app at this moment.');
+    }
   };
 
   const quickActions = [
@@ -144,7 +159,7 @@ export default function HomeScreen() {
   const styles = createStyles(colors);
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={true}>
       {/* Header */}
       <LinearGradient
         colors={[colors.primary, colors.accent]}
@@ -174,6 +189,12 @@ export default function HomeScreen() {
               style={styles.iconButton}
             >
               <Bell size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={handleShareApp} 
+              style={styles.iconButton}
+            >
+              <Share2 size={24} color="#FFFFFF" />
             </TouchableOpacity>
             <TouchableOpacity 
               onPress={() => router.push('/profile')} 
@@ -282,6 +303,11 @@ export default function HomeScreen() {
           {todayStats.moodEntries > 0 && (
             <Text style={styles.progressText}>
               😊 Your mood today: {getMoodText(todayStats.averageMood)} ({todayStats.averageMood.toFixed(1)}/5)
+            </Text>
+          )}
+          {todayStats.totalSpent > 0 && (
+            <Text style={styles.progressText}>
+              💰 You've spent ${todayStats.totalSpent.toFixed(2)} today. Keep track of your budget!
             </Text>
           )}
           {todayStats.pomodoroSessions === 0 && todayStats.habitsCompleted === 0 && todayStats.moodEntries === 0 && (

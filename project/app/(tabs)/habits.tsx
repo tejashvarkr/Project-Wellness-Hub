@@ -13,7 +13,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/services/supabase';
 import { Habit, HabitCompletion } from '@/types';
-import { Plus, CircleCheck as CheckCircle, Circle, Target, TrendingUp, Calendar, X } from 'lucide-react-native';
+import { Plus, CircleCheck as CheckCircle, Circle, Target, TrendingUp, Calendar, X, Trash2 } from 'lucide-react-native';
 
 export default function HabitsScreen() {
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -108,6 +108,36 @@ export default function HabitsScreen() {
     }
   };
 
+  const deleteHabit = async (habitId: string) => {
+    Alert.alert(
+      'Delete Habit',
+      'Are you sure you want to delete this habit? This will also remove all completion records.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('habits')
+                .delete()
+                .eq('id', habitId);
+
+              if (error) throw error;
+
+              setHabits(habits.filter(habit => habit.id !== habitId));
+              setCompletions(completions.filter(completion => completion.habit_id !== habitId));
+            } catch (error) {
+              console.error('Error deleting habit:', error);
+              Alert.alert('Error', 'Failed to delete habit');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const toggleHabitCompletion = async (habitId: string) => {
     const existingCompletion = completions.find(c => c.habit_id === habitId);
 
@@ -200,17 +230,19 @@ export default function HabitsScreen() {
       </View>
 
       {/* Habits List */}
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={true}>
         {habits.map((habit) => (
-          <TouchableOpacity
+          <View
             key={habit.id}
             style={[
               styles.habitCard,
               isHabitCompleted(habit.id) && styles.habitCompleted
             ]}
-            onPress={() => toggleHabitCompletion(habit.id)}
           >
-            <View style={styles.habitContent}>
+            <TouchableOpacity
+              style={styles.habitContent}
+              onPress={() => toggleHabitCompletion(habit.id)}
+            >
               {isHabitCompleted(habit.id) ? (
                 <CheckCircle size={24} color={colors.secondary} />
               ) : (
@@ -229,11 +261,19 @@ export default function HabitsScreen() {
                   </Text>
                 )}
               </View>
+            </TouchableOpacity>
+            <View style={styles.habitActions}>
+              <View style={styles.pointsBadge}>
+                <Text style={styles.pointsText}>+10</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={() => deleteHabit(habit.id)}
+              >
+                <Trash2 size={16} color={colors.error} />
+              </TouchableOpacity>
             </View>
-            <View style={styles.pointsBadge}>
-              <Text style={styles.pointsText}>+10</Text>
-            </View>
-          </TouchableOpacity>
+          </View>
         ))}
 
         {habits.length === 0 && !loading && (
@@ -261,7 +301,7 @@ export default function HabitsScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.modalContent}>
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={true}>
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Habit Title *</Text>
               <TextInput
@@ -289,7 +329,7 @@ export default function HabitsScreen() {
             <TouchableOpacity style={styles.createButton} onPress={addHabit}>
               <Text style={styles.createButtonText}>Create Habit</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -393,6 +433,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
+  habitActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   pointsBadge: {
     backgroundColor: colors.warning,
     borderRadius: 12,
@@ -403,6 +448,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  deleteButton: {
+    padding: 4,
   },
   emptyState: {
     alignItems: 'center',

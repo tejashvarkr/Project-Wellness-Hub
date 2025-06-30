@@ -8,12 +8,14 @@ import {
   Switch,
   Alert,
   Platform,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Bell, Clock, Heart, Target, Smile, DollarSign, Settings, CircleCheck as CheckCircle } from 'lucide-react-native';
+import { ArrowLeft, Bell, Clock, Heart, Target, Smile, DollarSign, Settings, CircleCheck as CheckCircle, X } from 'lucide-react-native';
 
 // Configure notifications
 Notifications.setNotificationHandler({
@@ -31,11 +33,14 @@ interface NotificationSetting {
   icon: any;
   color: string;
   enabled: boolean;
-  time?: string;
+  time: string;
 }
 
 export default function NotificationsScreen() {
   const [permissionGranted, setPermissionGranted] = useState(false);
+  const [showTimeModal, setShowTimeModal] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<string | null>(null);
+  const [tempTime, setTempTime] = useState('');
   const [notificationSettings, setNotificationSettings] = useState<NotificationSetting[]>([
     {
       id: 'habits',
@@ -127,11 +132,51 @@ export default function NotificationsScreen() {
     setNotificationSettings(updatedSettings);
   };
 
+  const openTimeModal = (id: string) => {
+    const setting = notificationSettings.find(s => s.id === id);
+    if (setting) {
+      setSelectedNotification(id);
+      setTempTime(setting.time);
+      setShowTimeModal(true);
+    }
+  };
+
+  const saveTime = () => {
+    if (!selectedNotification || !tempTime) return;
+
+    // Validate time format (HH:MM)
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (!timeRegex.test(tempTime)) {
+      Alert.alert('Invalid Time', 'Please enter time in HH:MM format (24-hour)');
+      return;
+    }
+
+    const updatedSettings = notificationSettings.map(setting => {
+      if (setting.id === selectedNotification) {
+        const updatedSetting = { ...setting, time: tempTime };
+        
+        // Reschedule notification if enabled
+        if (setting.enabled && permissionGranted) {
+          cancelNotification(setting.id);
+          scheduleNotification(updatedSetting);
+        }
+        
+        return updatedSetting;
+      }
+      return setting;
+    });
+
+    setNotificationSettings(updatedSettings);
+    setShowTimeModal(false);
+    setSelectedNotification(null);
+    setTempTime('');
+  };
+
   const scheduleNotification = async (setting: NotificationSetting) => {
     if (!permissionGranted) return;
 
     try {
-      const [hours, minutes] = setting.time!.split(':').map(Number);
+      const [hours, minutes] = setting.time.split(':').map(Number);
       
       await Notifications.scheduleNotificationAsync({
         identifier: setting.id,
@@ -241,7 +286,7 @@ export default function NotificationsScreen() {
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={true}>
         {/* Permission Status */}
         <View style={styles.permissionCard}>
           <View style={styles.permissionHeader}>
@@ -284,9 +329,15 @@ export default function NotificationsScreen() {
                 <View style={styles.settingText}>
                   <Text style={styles.settingTitle}>{setting.title}</Text>
                   <Text style={styles.settingDescription}>{setting.description}</Text>
-                  {setting.time && (
-                    <Text style={styles.settingTime}>Daily at {setting.time}</Text>
-                  )}
+                  <TouchableOpacity 
+                    style={styles.timeButton}
+                    onPress={() => openTimeModal(setting.id)}
+                    disabled={!permissionGranted}
+                  >
+                    <Text style={[styles.settingTime, !permissionGranted && styles.disabledText]}>
+                      Daily at {setting.time}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
               <Switch
@@ -324,7 +375,7 @@ export default function NotificationsScreen() {
             • Notifications help build consistent wellness habits
           </Text>
           <Text style={styles.tipsText}>
-            • You can customize notification times in your device settings
+            • Tap on the time to customize when you receive each notification
           </Text>
           <Text style={styles.tipsText}>
             • Turn off notifications you don't find helpful
@@ -334,6 +385,41 @@ export default function NotificationsScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Time Setting Modal */}
+      <Modal
+        visible={showTimeModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Set Notification Time</Text>
+            <TouchableOpacity onPress={() => setShowTimeModal(false)}>
+              <X size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.modalContent}>
+            <Text style={styles.inputLabel}>Time (24-hour format)</Text>
+            <TextInput
+              style={styles.timeInput}
+              value={tempTime}
+              onChangeText={setTempTime}
+              placeholder="HH:MM (e.g., 09:30)"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="numeric"
+            />
+            <Text style={styles.timeHint}>
+              Enter time in 24-hour format (e.g., 09:30 for 9:30 AM, 18:00 for 6:00 PM)
+            </Text>
+
+            <TouchableOpacity style={styles.saveButton} onPress={saveTime}>
+              <Text style={styles.saveButtonText}>Save Time</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -382,7 +468,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   permissionCard: {
     backgroundColor: colors.surface,
     marginHorizontal: 24,
-    marginTop: 24,
+    marginTop:  24,
     borderRadius: 16,
     padding: 20,
   },
@@ -463,11 +549,16 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  timeButton: {
+    marginTop: 4,
+  },
   settingTime: {
     fontSize: 12,
     color: colors.primary,
-    marginTop: 4,
     fontWeight: '500',
+  },
+  disabledText: {
+    opacity: 0.5,
   },
   testCard: {
     backgroundColor: colors.surface,
@@ -522,5 +613,61 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.text,
     lineHeight: 20,
     marginBottom: 8,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 60,
+    paddingBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  modalContent: {
+    flex: 1,
+    padding: 24,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  timeInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: colors.text,
+    backgroundColor: colors.surface,
+    marginBottom: 8,
+  },
+  timeHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 24,
+  },
+  saveButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
